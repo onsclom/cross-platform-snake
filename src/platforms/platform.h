@@ -25,17 +25,16 @@ typedef struct GameConfig {
   int width;
   int height;
   const char *title;
-  int target_fps;
 } GameConfig;
 
 void platform_clear(Rgba color);
 void platform_draw_rect(int x, int y, int width, int height, Rgba color);
 void platform_draw_text(const char *text, int x, int y, int font_size,
                         Rgba color);
+int  platform_measure_text(const char *text, int font_size);
 bool platform_input_down(InputAction action);
 bool platform_input_pressed(InputAction action);
 
 GameConfig game_config(void);
 void game_init(void);
-void game_update(float dt);
-void game_shutdown(void);
+void game_tick(float dt);

@@ -34,56 +34,65 @@ const targets = {
   },
 } as const;
 
-const target = targets[process.platform as keyof typeof targets];
-if (!target) {
-  console.error(`Unsupported platform: ${process.platform}`);
-  process.exit(1);
+export async function build(): Promise<string> {
+  const target = targets[process.platform as keyof typeof targets];
+  if (!target) {
+    console.error(`Unsupported platform: ${process.platform}`);
+    process.exit(1);
+  }
+
+  const flagsPath = `${root}/compile_flags.txt`;
+  if (!(await Bun.file(flagsPath).exists())) {
+    await Bun.write(flagsPath, `-I${includeDir}\n-std=${cStd}\n`);
+    console.log("Generated compile_flags.txt");
+  }
+
+  if (!Bun.which("zig")) {
+    console.error(
+      [
+        "Error: `zig` was not found on your PATH.",
+        "This project compiles with `zig cc`, so you need Zig installed.",
+        "",
+        "Install it: https://ziglang.org/learn/getting-started/#installing-zig",
+      ].join("\n"),
+    );
+    process.exit(1);
+  }
+
+  await mkdir(`${root}/build`, { recursive: true });
+
+  const args = [
+    "cc",
+    ...sources,
+    "-o",
+    `build/${target.out}`,
+    `-std=${cStd}`,
+    "-I",
+    includeDir,
+    "-L",
+    target.libDir,
+    "-lraylib",
+    ...target.systemLibs,
+  ];
+
+  console.log(`> zig ${args.join(" ")}`);
+  const proc = Bun.spawn(["zig", ...args], {
+    cwd: root,
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  await proc.exited;
+
+  if (proc.exitCode !== 0) {
+    console.error(`Build failed (exit ${proc.exitCode}).`);
+    process.exit(proc.exitCode ?? 1);
+  }
+
+  console.log(`Built build/${target.out}`);
+  return `build/${target.out}`;
 }
 
-const flagsPath = `${root}/compile_flags.txt`;
-if (!(await Bun.file(flagsPath).exists())) {
-  await Bun.write(flagsPath, `-I${includeDir}\n-std=${cStd}\n`);
-  console.log("Generated compile_flags.txt");
+// run directly: bun run scripts/build.ts
+if (import.meta.main) {
+  await build();
 }
-
-if (!Bun.which("zig")) {
-  console.error(
-    [
-      "Error: `zig` was not found on your PATH.",
-      "This project compiles with `zig cc`, so you need Zig installed.",
-      "",
-      "Install it: https://ziglang.org/learn/getting-started/#installing-zig",
-    ].join("\n"),
-  );
-  process.exit(1);
-}
-
-await mkdir(`${root}/build`, { recursive: true });
-
-const args = [
-  "cc",
-  ...sources,
-  "-o",
-  `build/${target.out}`,
-  `-std=${cStd}`,
-  "-I",
-  includeDir,
-  "-L",
-  target.libDir,
-  "-lraylib",
-  ...target.systemLibs,
-];
-
-console.log(`> zig ${args.join(" ")}`);
-const proc = Bun.spawn(["zig", ...args], {
-  cwd: root,
-  stdout: "inherit",
-  stderr: "inherit",
-});
-await proc.exited;
-
-if (proc.exitCode !== 0) {
-  console.error(`Build failed (exit ${proc.exitCode}).`);
-  process.exit(proc.exitCode ?? 1);
-}
-console.log(`Built build/${target.out}`);

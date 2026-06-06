@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "build": "bun run scripts/build.ts",
+    "build:web": "bun run scripts/build.ts web",
     "dev": "bun run scripts/dev.ts",
+    "dev:web": "bun run scripts/dev-web.ts",
     "postinstall": "bun run scripts/setup-vendor.ts"
   },
   "devDependencies": {

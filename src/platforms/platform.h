@@ -2,6 +2,14 @@
 
 #include <stdbool.h>
 
+#ifdef __wasm__
+#define WASM_EXPORT(name) __attribute__((export_name(#name)))
+#define WASM_IMPORT(name) __attribute__((import_module("env"), import_name(#name)))
+#else
+#define WASM_EXPORT(name)
+#define WASM_IMPORT(name)
+#endif
+
 typedef struct Rgba {
   unsigned char r, g, b, a;
 } Rgba;
@@ -21,20 +29,14 @@ typedef enum InputAction {
   INPUT_COUNT
 } InputAction;
 
-typedef struct GameConfig {
-  int width;
-  int height;
-  const char *title;
-} GameConfig;
-
-void platform_clear(Rgba color);
-void platform_draw_rect(int x, int y, int width, int height, Rgba color);
-void platform_draw_text(const char *text, int x, int y, int font_size,
-                        Rgba color);
-int  platform_measure_text(const char *text, int font_size);
-bool platform_input_down(InputAction action);
-bool platform_input_pressed(InputAction action);
-
-GameConfig game_config(void);
+WASM_IMPORT(platform_clear)         void platform_clear(Rgba color);
+WASM_IMPORT(platform_draw_rect)     void platform_draw_rect(int x, int y, int width, int height, Rgba color);
+WASM_IMPORT(platform_draw_text)     void platform_draw_text(const char *text, int x, int y, int font_size, Rgba color);
+WASM_IMPORT(platform_measure_text)  int  platform_measure_text(const char *text, int font_size);
+WASM_IMPORT(platform_input_down)    bool platform_input_down(InputAction action);
+WASM_IMPORT(platform_input_pressed) bool platform_input_pressed(InputAction action);
+int game_width(void);
+int game_height(void);
+const char *game_title(void);
 void game_init(void);
 void game_tick(float dt);

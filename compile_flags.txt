@@ -1,0 +1,2 @@
+-Ivendor/raylib/include
+-std=c99

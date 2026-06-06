@@ -1,11 +1,10 @@
 import { mkdir } from "node:fs/promises";
 
 const root = `${import.meta.dir}/..`;
-const sources = ["src/game/game.c", "src/platforms/raylib-platform.c"];
-const includeDir = "vendor/raylib/include";
 const cStd = "c99";
+const gameSrc = "src/game/game.c";
 
-const targets = {
+const nativeTargets = {
   win32: {
     out: "snake.exe",
     libDir: "vendor/raylib/lib/windows",
@@ -34,47 +33,16 @@ const targets = {
   },
 } as const;
 
-export async function build(): Promise<string> {
-  const target = targets[process.platform as keyof typeof targets];
-  if (!target) {
-    console.error(`Unsupported platform: ${process.platform}`);
-    process.exit(1);
-  }
-
-  const flagsPath = `${root}/compile_flags.txt`;
-  if (!(await Bun.file(flagsPath).exists())) {
-    await Bun.write(flagsPath, `-I${includeDir}\n-std=${cStd}\n`);
-    console.log("Generated compile_flags.txt");
-  }
-
+function ensureZig() {
   if (!Bun.which("zig")) {
     console.error(
-      [
-        "Error: `zig` was not found on your PATH.",
-        "This project compiles with `zig cc`, so you need Zig installed.",
-        "",
-        "Install it: https://ziglang.org/learn/getting-started/#installing-zig",
-      ].join("\n"),
+      "Error: `zig` not found on PATH. Install: https://ziglang.org/learn/getting-started/",
     );
     process.exit(1);
   }
+}
 
-  await mkdir(`${root}/build`, { recursive: true });
-
-  const args = [
-    "cc",
-    ...sources,
-    "-o",
-    `build/${target.out}`,
-    `-std=${cStd}`,
-    "-I",
-    includeDir,
-    "-L",
-    target.libDir,
-    "-lraylib",
-    ...target.systemLibs,
-  ];
-
+async function zig(args: string[]) {
   console.log(`> zig ${args.join(" ")}`);
   const proc = Bun.spawn(["zig", ...args], {
     cwd: root,
@@ -82,17 +50,68 @@ export async function build(): Promise<string> {
     stderr: "inherit",
   });
   await proc.exited;
-
   if (proc.exitCode !== 0) {
     console.error(`Build failed (exit ${proc.exitCode}).`);
     process.exit(proc.exitCode ?? 1);
   }
+}
+
+export async function buildNative(): Promise<string> {
+  const target = nativeTargets[process.platform as keyof typeof nativeTargets];
+  if (!target) {
+    console.error(`Unsupported platform: ${process.platform}`);
+    process.exit(1);
+  }
+
+  ensureZig();
+  await mkdir(`${root}/build`, { recursive: true });
+
+  await zig([
+    "cc",
+    gameSrc,
+    "src/platforms/raylib-platform.c",
+    "-o",
+    `build/${target.out}`,
+    `-std=${cStd}`,
+    "-I",
+    "vendor/raylib/include",
+    "-L",
+    target.libDir,
+    "-lraylib",
+    ...target.systemLibs,
+  ]);
 
   console.log(`Built build/${target.out}`);
   return `build/${target.out}`;
 }
 
-// run directly: bun run scripts/build.ts
+export async function buildWeb(): Promise<void> {
+  ensureZig();
+  const outDir = `${root}/build/web`;
+  await mkdir(outDir, { recursive: true });
+
+  await zig([
+    "cc",
+    gameSrc,
+    "-target",
+    "wasm32-freestanding",
+    `-std=${cStd}`,
+    "-O2",
+    "-o",
+    `${outDir}/snake.wasm`,
+    "-Wl,--no-entry",
+    "-Wl,--export-dynamic",
+    "-Wl,--export-memory",
+  ]);
+
+  console.log(`Built ${outDir}/snake.wasm`);
+}
+
 if (import.meta.main) {
-  await build();
+  const target = process.argv[2];
+  if (target === "web") {
+    await buildWeb();
+  } else {
+    await buildNative();
+  }
 }

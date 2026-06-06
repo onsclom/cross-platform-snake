@@ -61,8 +61,7 @@ bool platform_input_pressed(InputAction action) {
 }
 
 int main(void) {
-  GameConfig cfg = game_config();
-  InitWindow(cfg.width, cfg.height, cfg.title);
+  InitWindow(game_width(), game_height(), game_title());
 
   game_init();
   while (!WindowShouldClose()) {

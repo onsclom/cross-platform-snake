@@ -1,6 +1,6 @@
-import { build } from "./build.ts";
+import { buildNative } from "./build.ts";
 
-const exe = await build();
+const exe = await buildNative();
 
 console.log(`\n> ./${exe}`);
 const proc = Bun.spawn([`./${exe}`], {
